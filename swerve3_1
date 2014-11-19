@@ -1,0 +1,196 @@
+/*This is a different fromat than the regular library files, 
+because it is in the arduino IDE and is a tab and not an external file
+We have these files directly in the IDE, as if they are external, 
+we have to actively reload them after any changes are made on them.
+*/
+#include "KCswerve310.h"
+/*
+These are two files which make it much eaiser to program with the sasquatch
+as they already have all the ports portioned off and numbered properly.
+If we did not use these library files we would have to add ridiculous numbers
+to the ports we were using
+*/
+#include <ROEncoder.h>
+#include<ROAnalog.h>             
+
+//slave sasquatch
+// I do not know which one of these are un-needed.
+/*
+These were the files that the robot open library showed having open as defalut.
+Whether or not any of these are necessary exceept Wire is unknown.
+*/
+#include <SPI.h>
+#include <SD.h>
+#include <Ethernet.h>
+#include <Servo.h>
+#include <Wire.h>// we definitely need this one
+#include <EEPROM.h>
+/*
+// this is for the max and min functions
+There was an #include <algorithm> file but the arduino,
+already has the max and min functions inherently in it
+andthe algorithm library is not one of the predownloaded libraries.
+*/
+/*
+using namespace KCs ; 
+*/
+/*
+The PWMs on the cRIO go from 0 - 255
+but 0 is special and only used for the disabled state.
+The talons will blink orange when in the disabled state
+The values we need to use on the the motors go from 1-255
+but we assign them through -1 <->1 hence the conversion
+//Preprocessor directives = better constants
+*/
+#define PwmZero 128.0
+#define PwmSize 127.0
+//These values are per rotation
+//self explanatory???
+  #define AnalogRes 1024
+  #define DigitalRes 250
+/*
+The four input bytes are so we can quickly copy the values from the I2C in,
+as the other function is then going to be called.
+*/
+byte inputX, inputY, inputR, inputUnused;
+/* The point of having two seperate
+places where values are being stored in sent is that there are operations
+that need to be done to them after they are initially computed 
+*/
+byte ToSend[8];//wierd type being sent
+double* BeforeSend;
+/*
+This iteration does not yet have a class for the slope and
+intercept and so they are currently free floating.
+*/
+double minSlope,ddintercept;
+/*
+This union allows us to store and then access values without need to do 
+a  bunch of binary math, as the values are stored in the same location
+but are acessed slightly differently.
+This operation would also be possible through a void pointer 
+but it would be intrinsicly more messy
+*/
+union buffer_t{
+ byte out[8];
+ word in[4];
+ long inlong[2];
+}buffer;
+
+//called on start up
+  PIDlong test;
+  MotorValues FR(0);//since they are technically classes 
+  MotorValues BR(1);
+  MotorValues BL(2);
+  MotorValues FL(3);
+void setup() {
+  pinMode(6,OUTPUT);
+  pinMode(5,OUTPUT);
+  pinMode(4,OUTPUT);
+  FR.analogOffset = FR.RotationE -> read();//This is so that the rotation passed to the library class
+  BR.analogOffset = BR.RotationE -> read();// is actually useful
+  BL.analogOffset = BL.RotationE -> read();
+  FL.analogOffset = FL.RotationE -> read();
+  Wire.begin(84);                  //The address done through the I2C standard
+  Wire.onReceive(in);            //The function that is run when the cRIO sends info
+  Wire.onRequest(out);         //The function that is run  when the cRIO askes for info
+      for(int i=0; i<8 ; i++){
+       BeforeSend[i] = 0;
+    }
+}
+//Unused but necessary
+void loop() {
+  digitalWrite(4,HIGH);
+  digitalWrite(5,HIGH);
+  digitalWrite(6,HIGH);  
+  if (Serial1){
+    test.shift();
+    test.current = millis();
+      inputX = 0;//Grabs all 4 values and makes them global variables
+      inputY = 0;//note these data values are bytes
+      inputR = 0;
+      inputUnused = Wire.read();
+    digitalWrite(4,LOW);
+    out();
+    Serial.print(FR.time.delta());
+    Serial.print(":::");
+    Serial.println(test.delta());
+  }
+}
+
+//called when data comes in
+void in(int control){
+  inputX = Wire.read();//Grabs all 4 values and makes them global variables
+  inputY = Wire.read();//note these data values are bytes
+  inputR = Wire.read();
+  inputUnused = Wire.read();
+}
+
+//called when data is asked to be sent out.
+void out(){
+
+// Here it applies the wierdness algorithm
+   BeforeSend[0] = FR.lincomp(minSlope, ddintercept, BeforeSend[0]) ;    
+   BeforeSend[1] = BR.lincomp(minSlope, ddintercept, BeforeSend[1]) ; 
+   BeforeSend[2] = BL.lincomp(minSlope, ddintercept, BeforeSend[2]) ; 
+   BeforeSend[3] = FL  .lincomp(minSlope, ddintercept, BeforeSend[3]) ;  
+// this flips all the values that need to be flipped  
+swerve.inversion(BeforeSend,  FR.assigned.current,
+                              BR.assigned.current,
+                              BL.assigned.current,
+                              FL.assigned.current);    
+                              
+// error code will possibly be an if-else structure around this for loop and others
+// this moves it into the final array.
+ if(inputUnused != 0){
+     if(inputUnused == 1){
+          buffer.in[0] = FR.RotationE -> read();
+          buffer.in[1] = BR.RotationE -> read();
+          buffer.in[2] = BL.RotationE -> read();
+          buffer.in[3] = FL.RotationE -> read();
+     }else if(inputUnused == 2){
+          buffer.inlong[0] = FR.SpeedE -> read();
+          buffer.inlong[1] = BR.SpeedE -> read();
+     }else if(inputUnused == 3){
+          buffer.inlong[0] = FR.SpeedE -> read();
+          buffer.inlong[1] = BR.SpeedE -> read();
+     }else{
+          //buffer.inlong[0]
+          //buffer.inlong[
+     }
+      for(int i=0; i<8 ; i++){
+           ToSend[i] = buffer.out[i];}   
+//defalut state  
+}else{
+    for(int i=0; i<8 ; i++){
+       ToSend[i] = byte(BeforeSend[i]*PwmSize +PwmZero);
+    }
+  }
+  
+  
+// finally send values
+  Wire.write(ToSend,8);// an array of bytes can be sent out
+  //timing code
+  digitalWrite(5,HIGH);
+  test.shift();
+  test.current = millis();
+  // calculate speed and wierdness
+  FR.derive();
+  BR.derive();
+  BL.derive();
+  FL.derive();
+  // This chooses the line (slope and intercept) to be used for all wierdness calculations
+  swerve.mx_b(minSlope, ddintercept, FR, BR, BL, FL);
+   
+  BeforeSend = swerve.update(
+      (double(inputX) - PwmZero) / PwmSize,
+      (double(inputY) - PwmZero) / PwmSize,
+      (double(inputR) - PwmZero) / PwmSize,
+      double((FR.RotationE -> read() - FR.analogOffset) / AnalogRes)*2.0*PI, // THIS gets the values in radians
+      double((BR.RotationE -> read() - BR.analogOffset) / AnalogRes)*2.0*PI,
+      double((BL.RotationE -> read() - BL.analogOffset) / AnalogRes)*2.0*PI,
+      double((FL.RotationE -> read() - FL.analogOffset) / AnalogRes)*2.0*PI   );
+      
+swerve.maxGen(BeforeSend);// not that this funciton modifies the values in the before send array.
+
+}
