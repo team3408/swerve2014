@@ -26,6 +26,8 @@ The loop function will be arranged so that it calls the updating functions only 
 The in function should only read the 5 values from the array and store them in the memory somewhere.
 
 The out function should only shift out the 16 values it needs to shift out. 8 for the actual drive, and 8 for data analysis.
-
+END
+===
+The rest of the discription can be found in the wiki pages.
 
 
