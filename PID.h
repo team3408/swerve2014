@@ -3,16 +3,25 @@
 
 // all PID opperations need these values and so layering them makes sense
 struct PIDlong{
-  long current;
-  long previous;
-  inline void shift(){previous = current;};// intended to make it faster
-  inline long delta(){return current - previous;}
+  long* all;
+  PIDlong();
+  inline long current();
+  inline long previous();
+  void shift();
+  inline long delta();
+  long average();
+  long average(int,int);
+  long averageDelta();
 };
 struct PIDdouble {
-  double current;
-  double previous;
-  inline void shift(){previous = current;};
-  inline double delta(){return current - previous;}
-};
-
+  double* all;
+  PIDlong();
+  inline double current();
+  inline double previous();
+  void shift();
+  inline double delta();
+  double average();
+  double average(int,int);
+  double averageDelta();
+  };
 #endif
