@@ -12,9 +12,11 @@
 
 class vector {
      public:
-        vector (double,double);
-        void rotate (double radians);
-        vector* operator + (vector& second);
+        vector(double,double);
+        void changeto(double,double);
+        void rotate(double radians);
+        void rotatePiOver4();
+        vector* combine(vector& second);
         double m();
         double r();
         double x();
@@ -22,3 +24,4 @@ class vector {
      private:
         double xx, yy, rotation, magnitude;
 };
+#endif
