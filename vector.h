@@ -12,6 +12,7 @@
 
 class vector {
      public:
+        vector();
         vector(double,double);
         vector changeto(double,double);//these 3 functions return a reference to the class.
         vector rotate(double radians);//I think it will be useful
