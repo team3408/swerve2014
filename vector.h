@@ -13,10 +13,10 @@
 class vector {
      public:
         vector(double,double);
-        void changeto(double,double);
-        void rotate(double radians);
-        void rotatePiOver4();
-        vector* combine(vector& second);
+        vector* changeto(double,double);//these 3 functions return a reference to the class.
+        vector* rotate(double radians);//I think it will be useful
+        vector* rotatePiOver2();
+        vector* combine(vector& second);//this will point to a new vector.
         double m();
         double r();
         double x();
